@@ -27,7 +27,8 @@ namespace RankedChoice
             string fullCsvFilePath = Path.Combine(AppRoot, relativeCsvFilePath);
             if (!File.Exists(fullCsvFilePath))
             {
-                Console.WriteLine("Expected CSV file at {0} to exist, but it didn't.", fullCsvFilePath);
+                Console.WriteLine("Expected provided CSV file at {0} to exist, but it didn't.", fullCsvFilePath);
+                return;
             }
 
             List<List<string>> voteRecords = File.ReadAllLines(fullCsvFilePath).Select(csvRow => csvRow.Split(','))
@@ -93,7 +94,18 @@ namespace RankedChoice
             }
 
             string worstFirstRankedCandidate =
-                totaledVotes.OrderBy(vote => vote.Value).Select(vote => vote.Key).FirstOrDefault();
+                // Deterministic worst-first-ranked
+                totaledVotes.OrderBy(vote =>
+                {
+                    int voteCount = vote.Value;
+                    // Rescale the vote's hash from range [0, int.MaxValue] into range [0.0, 1.0]
+                    double fraction = Math.Abs(vote.Key.GetHashCode()) * 1.0 / int.MaxValue;
+                    if (fraction < 0 || 1 < fraction)
+                    {
+                        throw new ArgumentException($"Unexpected fractional value {fraction} for vote {vote}");
+                    }
+                    return voteCount + fraction;
+                }).Select(vote => vote.Key).FirstOrDefault();
 
             List<List<string>> modifiedVotes = votes.Select(ranked =>
             {
